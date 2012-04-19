@@ -16,6 +16,8 @@ for my $iNeuron (1 .. 1000) {
 		NeuralNetwork::getInstance()->addInput($iNeuron, int(rand(999999)), int(rand(1999999)));
 	}
 }
+# Grab the activation object
+my($oActivation) = NeuralNetwork::getInstance()->getActivation();
 # Print the neuron map
 # NeuralNetwork::getInstance()->dumpNeurons();
 # Generate and display the neuron output
@@ -23,11 +25,11 @@ print "\n";
 print "-------------------------------------\n";
 print "--- The Activation Results Is -------\n";
 print "-------------------------------------\n";
-print NeuralNetwork::getInstance()->getActivation()->{"bActive"};
-print " or ", ((NeuralNetwork::getInstance()->getActivation()->{"bActive"} eq 1) ? "True" : "False");
+print $oActivation->{"bActive"};
+print " or ", (($oActivation->{"bActive"} eq 1) ? "True" : "False");
 print "\n\n";
 print "-------------------------------------\n";
 print "--- The Total Outcome Was -----------\n";
 print "-------------------------------------\n";
-print NeuralNetwork::getInstance()->getActivation()->{"iOutput"};
+print $oActivation->{"iOutput"};
 print "\n\n";
