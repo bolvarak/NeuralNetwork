@@ -26,8 +26,8 @@ sub new {
 	my($sClass) = shift;
 	# Setup the instance
 	my($oSelf)  = {
+		iBias      => -1.0, 
 		oLayers    => {},
-		oNeurons   => {}, 
 		iThreshold => 0
 	};
 	# Set the instance
@@ -38,22 +38,23 @@ sub new {
 ###############################################################################
 ### Public ###################################################################
 #############################################################################
-sub addInput {
+sub addInputs {
 	# Grab the instance
 	my($oSelf)   = shift;
 	# Grab the layer identifier
 	my($iLayer)  = shift;
 	# Grab the neuron identifier
 	my($iNeuron) = shift;
-	# Grab the weight
-	my($iWeight) = shift;
-	# Grab the value
-	my($iValue)  = shift;
-	# Append the input to the inputs
-	push(@{$oSelf->{"oLayers"}{$iLayer}{$iNeuron}}, {
-		iValue  => $iValue,
-		iWeight => $iWeight
-	});
+	# Grab the number of inputs
+	my($iInputs) = shift;
+	# Loop to the inputs
+	for (my $iInput = 0; $iInput < $iInputs; $iInput ++) {
+		# Append the input to the inputs
+		push(@{$oSelf->{"oLayers"}{$iLayer}{$iNeuron}}, {
+			iInput  => $iInput,
+			iWeight => $oSelf->getWeight()
+		});
+	}
 	# Return instance
 	return $oSelf; 
 }
@@ -97,7 +98,7 @@ sub dumpNetwork {
 			# Loop through the inputs
 			for my $oInput (@{$oSelf->{"oLayers"}{$iLayer}{$iNeuron}}) {
 				# Print the input
-				print("\t\t", "iValue => ", $oInput->{"iValue"}, "\n");
+				print("\t\t", "iInput => ", $oInput->{"iInput"}, "\n");
 				# Print the weight
 				print("\t\t", "iWeight => ", $oInput->{"iWeight"}, "\n\n");
 			}
@@ -108,7 +109,7 @@ sub dumpNetwork {
 	# Grab the activation
 	my($oActivation) = $oSelf->getActivation();
 	# Start the activation print
-	print("Activation => ", "\n");
+	print("oActivation => ", "\n");
 	# Print the active status
 	print("\t", "bActive => ", $oActivation->{"bActive"}, "\n");
 	# Print the output
@@ -137,7 +138,7 @@ sub getActivation {
 			# Loop through the inputs
 			for my $oInput (@{$oSelf->{"oLayers"}{$iLayer}{$iNeuron}}) {
 				# Multiply to get the output
-				$iActivation += (int $oInput->{"iWeight"} * int $oInput->{"iValue"});
+				$iActivation += (int $oInput->{"iWeight"} * int $oInput->{"iInput"});
 			}
 		} else {
 			# The layer or neuron doesn't exist
@@ -151,7 +152,7 @@ sub getActivation {
 				# Loop through the inputs
 				for my $oInput (@{$oSelf->{"oLayers"}{$iLayer}{$iNeuronId}}) {
 					# Multiply to get the output
-					$iActivation += (int $oInput->{"iWeight"} * $oInput->{"iValue"});
+					$iActivation += (int $oInput->{"iWeight"} * $oInput->{"iInput"});
 				}
 			}
 		} else {
@@ -166,7 +167,7 @@ sub getActivation {
 				# Loop through the inputs
 				for my $oInput (@{$oSelf->{"oLayers"}{$iLayerId}{$iNeuronId}}) {
 					# Multiply to get the output
-					$iActivation += (int $oInput->{"iWeight"} * $oInput->{"iValue"});
+					$iActivation += (int $oInput->{"iWeight"} * $oInput->{"iInput"});
 				}
 			}
 		}
@@ -191,6 +192,19 @@ sub getThreshold {
 	my($oSelf) = shift;
 	# Return the threshold
 	return $oSelf->{"iThreshold"};
+}
+sub getWeight {
+	# Grab the instance
+	my($oSelf)    = shift;
+	# Generate the random number
+	my($iWeight)  = rand(1.0);
+	# Now generate a random boolean
+	if (int(rand(2))) {
+		# Make the weight negative
+		$iWeight *= -1;
+	}
+	# Return a random weight
+	return $iWeight;
 }
 ###############################################################################
 ### Setters ##################################################################
