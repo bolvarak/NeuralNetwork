@@ -3,11 +3,13 @@
 package NeuralNetwork;
 # Use strict syntax
 use strict;
+# Use Perl's trigonometry packages
+use Math::Trig;
 # Our instance placeholder
 my($oInstance);
-###############################################################################
-### Singleton ################################################################
-#############################################################################
+ #############################################################################
+### Singleton #################################################################
+ #############################################################################
 sub getInstance {
 	# Check for an existing instance
 	if ($oInstance) {
@@ -18,9 +20,9 @@ sub getInstance {
 		return new NeuralNetwork();
 	}
 }
-###############################################################################
-### Constructor ##############################################################
-#############################################################################
+ #############################################################################
+### Constructor ###############################################################
+ #############################################################################
 sub new {
 	# Grab the class name
 	my($sClass) = shift;
@@ -35,9 +37,27 @@ sub new {
 	# Return the instance
 	return $oInstance;
 }
-###############################################################################
+
+ ############################################################################
 ### Public ###################################################################
-#############################################################################
+ ############################################################################
+sub addInput {
+	# Grab the instance
+	my($oSelf)   = shift;
+	# Grab the layer identifier
+	my($iLayer)  = shift;
+	# Grab the neuron identifier
+	my($iNeuron) = shift;
+	# Grab the value
+	my($iValue)  = shift;
+	# Append the input
+	push(@{$oSelf->{"oLayers"}{$iLayer}{$iNeuron}}, {
+		iInput  => (($iValue) ? $iValue : (scalar(@{$oSelf->{"oLayers"}{$iLayer}{$iNeuron}}))), 
+		iWeight => $oSelf->getWeight()
+	});
+	# Return instance
+	return $oSelf;
+}
 sub addInputs {
 	# Grab the instance
 	my($oSelf)   = shift;
@@ -107,21 +127,30 @@ sub dumpNetwork {
 	# Space out the map
 	print("\n\n");
 	# Grab the activation
-	my($oActivation) = $oSelf->getActivation();
+	my(@aActivations) = $oSelf->getActivation();
 	# Start the activation print
-	print("oActivation => ", "\n");
-	# Print the active status
-	print("\t", "bActive => ", $oActivation->{"bActive"}, "\n");
-	# Print the output
-	print("\t", "iOutput => ", $oActivation->{"iOutput"}, "\n");
+	print("aActivations => ", "\n");
+	# Loop through the activations
+	for my $oActivation (@aActivations) {
+		# Print the active status
+		print("\t", "bActive => ", $oActivation->{"bActive"}, "\n");
+		# Print the layer
+		print("\t", "iLayerId => ", $oActivation->{"iLayerId"}, "\n");
+		# Print the neuron
+		print("\t", "iNeuronId => ", $oActivation->{"iNeuronId"}, "\n");
+		# Print the output
+		print("\t", "iOutput => ", $oActivation->{"iOutput"}, "\n");
+		# Print the sigmoid
+		print("\t", "iSigmoid => ", $oActivation->{"iSigmoid"}, "\n\n");
+	}
 	# Finish the map
 	print("\n\n");
 	# Return
 	return undef;
 }
-###############################################################################
-### Getters ##################################################################
-#############################################################################
+ #############################################################################
+### Getters ###################################################################
+ #############################################################################
 sub getActivation {
 	# Grab the instance 
 	my($oSelf)       = shift;
@@ -129,6 +158,8 @@ sub getActivation {
 	my($iLayer)      = shift or undef;
 	# Grab the neuron identifier
 	my($iNeuron)     = shift or undef;
+	# Activations object placeholder
+	my(@aActivations);
 	# Set the activation placeholder
 	my($iActivation) = 0;
 	# Check for a neuron
@@ -140,6 +171,14 @@ sub getActivation {
 				# Multiply to get the output
 				$iActivation += (int $oInput->{"iWeight"} * int $oInput->{"iInput"});
 			}
+			# push the activation to the array
+			push(@aActivations, {
+				"bActive"   => (($iActivation ge $oSelf->{"iThreshold"}) ? 1 : 0), 
+				"iLayerId"  => $iLayer, 
+				"iNeuronId" => $iNeuron, 
+				"iOutput"   => $iActivation, 
+				"iSigmoid"  => $oSelf->getSigmoid($iActivation)
+			});
 		} else {
 			# The layer or neuron doesn't exist
 			return undef;
@@ -149,11 +188,21 @@ sub getActivation {
 		if ($oSelf->{"oLayers"}{$iLayer}) {
 			# Loop through the neurons in the layer
 			while (my($iNeuronId, $oNeuron) = each(%{$oSelf->{"oLayer"}{$iLayer}})) {
+				# Reset the activation
+				$iActivation = 0;
 				# Loop through the inputs
 				for my $oInput (@{$oSelf->{"oLayers"}{$iLayer}{$iNeuronId}}) {
 					# Multiply to get the output
 					$iActivation += (int $oInput->{"iWeight"} * $oInput->{"iInput"});
 				}
+				# push the activation to the array
+				push(@aActivations, {
+					"bActive"   => (($iActivation ge $oSelf->{"iThreshold"}) ? 1 : 0), 
+					"iLayerId"  => $iLayer,
+					"iNeuronId" => $iNeuronId,
+					"iOutput"   => $iActivation, 
+					"iSigmoid"  => $oSelf->getSigmoid($iActivation)
+				});
 			}
 		} else {
 			# The layer does not exist
@@ -164,28 +213,32 @@ sub getActivation {
 		while (my($iLayerId, $oNeurons) = each(%{$oSelf->{"oLayers"}})) {
 			# Loop through the neurons
 			while (my($iNeuronId, $oNeuron) = each(%{$oSelf->{"oLayers"}{$iLayerId}})) {
+				# Reset the activation
+				$iActivation = 0;
 				# Loop through the inputs
 				for my $oInput (@{$oSelf->{"oLayers"}{$iLayerId}{$iNeuronId}}) {
 					# Multiply to get the output
 					$iActivation += (int $oInput->{"iWeight"} * $oInput->{"iInput"});
 				}
+				# push the activation to the array
+				push(@aActivations, {
+					"bActive"   => (($iActivation ge $oSelf->{"iThreshold"}) ? 1 : 0), 
+					"iLayerId"  => $iLayerId, 
+					"iNeuronId" => $iNeuronId,
+					"iOutput"   => $iActivation, 
+					"iSigmoid"  => $oSelf->getSigmoid($iActivation)
+				});
 			}
 		}
 	}
-	# Check the output
-	if ($iActivation ge $oSelf->{"iThreshold"}) {
-		# Return the output
-		return {
-			bActive => 1, 
-			iOutput => $iActivation
-		};
-	} else {
-		# Return the output
-		return {
-			bActive => 0, 
-			iOutput => $iActivation
-		};
-	}
+	# Return the activations
+	return @aActivations;
+}
+sub getSigmoid {
+	# Grab the instance and activation
+	my($oSelf, $iActivation) = @_;
+	# Return the output
+	return tanh($iActivation);
 }
 sub getThreshold {
 	# Grab the instance
@@ -206,9 +259,9 @@ sub getWeight {
 	# Return a random weight
 	return $iWeight;
 }
-###############################################################################
-### Setters ##################################################################
-#############################################################################
+ #############################################################################
+### Setters ###################################################################
+ #############################################################################
 sub setThreshold {
 	# Grab the instance and threshold
 	my($oSelf, $iThreshold) = @_;
@@ -217,8 +270,8 @@ sub setThreshold {
 	# Return instance
 	return $oSelf;
 }
-###############################################################################
-### Destructor ###############################################################
-#############################################################################
+ #############################################################################
+### Destructor ################################################################
+ #############################################################################
 1;
 __END__;

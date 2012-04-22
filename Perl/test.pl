@@ -17,7 +17,7 @@ for my $iNeuron (1 .. 3) {
 # Grab the activation object
 my($oActivation) = NeuralNetwork::getInstance()->getActivation();
 # Print the neuron map
-# NeuralNetwork::getInstance()->dumpNetwork();
+NeuralNetwork::getInstance()->dumpNetwork();
 # Generate and display the neuron output
 print "\n";
 print "-------------------------------------\n";
@@ -30,4 +30,9 @@ print "-------------------------------------\n";
 print "--- The Total Outcome Was -----------\n";
 print "-------------------------------------\n";
 print $oActivation->{"iOutput"};
+print "\n\n";
+print "-------------------------------------\n";
+print "--- The Sigmoid Is ------------------\n";
+print "-------------------------------------\n";
+print $oActivation->{"iSigmoid"};
 print "\n\n";
