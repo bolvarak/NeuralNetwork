@@ -13,13 +13,15 @@ my($oInstance);
 ### Singleton #################################################################
  #############################################################################
 sub getInstance {
+	# Grab the instance reset flag
+	my($iResetInstance) = shift or 0;
 	# Check for an existing instance
-	if ($oInstance) {
-		# Simply return the existing instance
-		return $oInstance;
-	} else {
+	if (!$oInstance or $iResetInstance) {
 		# Return a new instance
 		return new NeuralNetwork();
+	} else {
+		# Simply return the existing instance
+		return $oInstance;
 	}
 }
  #############################################################################
@@ -30,7 +32,10 @@ sub new {
 	my($sClass) = shift;
 	# Setup the instance
 	my($oSelf)  = {
-		iBias      => -1.0, 
+		oBias      => {
+			iValue  => 0, 
+			iWeight => 0
+		}, 
 		oDbc       => DBI->connect("dbi:SQLite:dbname=Db/NeuralNetwork.db", "", "", {
 			RaiseError => 1
 		}),
@@ -143,6 +148,14 @@ sub dumpNetwork {
 	}
 	# Space out the map
 	print("\n\n");
+	# Start the bias print
+	print("oBias => ", "\n");
+	# Print the bias value
+	print("\t", "iValue => ", $oSelf->{"oBias"}{"iValue"}, "\n");
+	# Print the bias weight
+	print("\t", "iWeight => ", $oSelf->{"oBias"}{"iWeight"}, "\n");
+	# Make way for the next section
+	print("\n");
 	# Grab the activation
 	my(@aActivations) = $oSelf->getActivation();
 	# Start the activation print
@@ -150,7 +163,7 @@ sub dumpNetwork {
 	# Loop through the activations
 	for my $oActivation (@aActivations) {
 		# Print the active status
-		print("\t", "bActive => ", $oActivation->{"bActive"}, "\n");
+		# print("\t", "bActive => ", $oActivation->{"bActive"}, "\n");
 		# Print the layer
 		print("\t", "iLayerId => ", $oActivation->{"iLayerId"}, "\n");
 		# Print the neuron
@@ -171,7 +184,7 @@ sub storeActivation {
 	# Generate the statement
 	my($oStatement)          = $oSelf->{"oDbc"}->prepare("INSERT INTO Output (iNeuronId, iLayerId, iOutput, bActive, iSigmoid, sCreated) VALUES (?, ?, ?, ?, ?, datetime());");
 	# Execute the statement
-	$oStatement->execute($oActivation->{"iNeuronId"}, $oActivation->{"iLayerId"}, $oActivation->{"iOutput"}, $oActivation->{"bActive"}, $oActivation->{"iSigmoid"});
+	$oStatement->execute($oActivation->{"iNeuronId"}, $oActivation->{"iLayerId"}, $oActivation->{"iOutput"}, $oActivation->{"bActive"}, ($oActivation->{"iSigmoid"} or undef));
 	# Return the activation id
 	return $oSelf->{"oDbc"}->last_insert_id("", "", "Output", "");
 }
@@ -228,13 +241,25 @@ sub getActivation {
 				# Multiply to get the output
 				$iActivation += (int $oInput->{"iWeight"} * int $oInput->{"iInput"});
 			}
+			# Compensate for the bias
+			$iActivation += ($oSelf->{"oBias"}{"iValue"} * $oSelf->{"iValue"}{"iWeight"});
+			# Generate the sigmoid
+			my($iSigmoid)  = $oSelf->getSigmoid($iActivation);
+			# Generate the output id
+			my($iOutputId) = $oSelf->storeActivation({
+			#	"bActive"   => (($iActivation ge $oSelf->{"iThreshold"}) ? 1 : 0),
+				"iLayerId"  => $iLayer,
+				"iNeuronId" => $iNeuron,
+				"iOutput"   => $iActivation,
+				"iSigmoid"  => $iSigmoid
+			});
 			# push the activation to the array
 			push(@aActivations, {
-				"bActive"   => (($iActivation ge $oSelf->{"iThreshold"}) ? 1 : 0), 
+			#	"bActive"   => (($iActivation ge $oSelf->{"iThreshold"}) ? 1 : 0), 
 				"iLayerId"  => $iLayer, 
-				"iNeuronId" => $iNeuron, 
+				"iNeuronId" => $iNeuron,
 				"iOutput"   => $iActivation, 
-				"iSigmoid"  => $oSelf->getSigmoid($iActivation)
+				"iSigmoid"  => $iSigmoid
 			});
 		} else {
 			# The layer or neuron doesn't exist
@@ -252,13 +277,25 @@ sub getActivation {
 					# Multiply to get the output
 					$iActivation += (int $oInput->{"iWeight"} * $oInput->{"iInput"});
 				}
-				# push the activation to the array
-				push(@aActivations, {
-					"bActive"   => (($iActivation ge $oSelf->{"iThreshold"}) ? 1 : 0), 
+				# Compensate for the bias
+				$iActivation += ($oSelf->{"oBias"}{"iValue"} * $oSelf->{"iValue"}{"iWeight"});
+				# Generate the sigmoid
+				my($iSigmoid)  = $oSelf->getSigmoid($iActivation);
+				# Generate the output id
+				my($iOutputId) = $oSelf->storeActivation({
+				#	"bActive"   => (($iActivation ge $oSelf->{"iThreshold"}) ? 1 : 0),
 					"iLayerId"  => $iLayer,
 					"iNeuronId" => $iNeuronId,
+					"iOutput"   => $iActivation,
+					"iSigmoid"  => $iSigmoid
+				});
+				# push the activation to the array
+				push(@aActivations, {
+				#	"bActive"   => (($iActivation ge $oSelf->{"iThreshold"}) ? 1 : 0), 
+					"iLayerId"  => $iLayer, 
+					"iNeuronId" => $iNeuronId,
 					"iOutput"   => $iActivation, 
-					"iSigmoid"  => $oSelf->getSigmoid($iActivation)
+					"iSigmoid"  => $iSigmoid
 				});
 			}
 		} else {
@@ -277,11 +314,13 @@ sub getActivation {
 					# Multiply to get the output
 					$iActivation += (int $oInput->{"iWeight"} * $oInput->{"iInput"});
 				}
+				# Compensate for the bias
+				$iActivation += ($oSelf->{"oBias"}{"iValue"} * $oSelf->{"oBias"}{"iWeight"});
 				# Generate the sigmoid
 				my($iSigmoid)  = $oSelf->getSigmoid($iActivation);
 				# Generate the output id
 				my($iOutputId) = $oSelf->storeActivation({
-					"bActive"   => (($iActivation ge $oSelf->{"iThreshold"}) ? 1 : 0),
+				#	"bActive"   => (($iActivation ge $oSelf->{"iThreshold"}) ? 1 : 0),
 					"iLayerId"  => $iLayerId,
 					"iNeuronId" => $iNeuronId,
 					"iOutput"   => $iActivation,
@@ -289,7 +328,7 @@ sub getActivation {
 				});
 				# push the activation to the array
 				push(@aActivations, {
-					"bActive"   => (($iActivation ge $oSelf->{"iThreshold"}) ? 1 : 0), 
+				#	"bActive"   => (($iActivation ge $oSelf->{"iThreshold"}) ? 1 : 0), 
 					"iLayerId"  => $iLayerId, 
 					"iNeuronId" => $iNeuronId,
 					"iOutput"   => $iActivation, 
@@ -300,6 +339,12 @@ sub getActivation {
 	}
 	# Return the activations
 	return @aActivations;
+}
+sub getBias {
+	# Grab the instance
+	my($oSelf) = shift;
+	# Return the bias
+	return $oSelf->{"iBias"};
 }
 sub getSigmoid {
 	# Grab the instance and activation
@@ -320,12 +365,26 @@ sub getWeight {
 	my($oSelf)    = shift;
 	# Generate the random number
 	my($iWeight)  = rand(1.0);
+	# Now determine if this weight should be negative
+	if (int rand(2)) {
+		# Update the weight
+		$iWeight *= -1;
+	}
 	# Return a random weight
 	return $iWeight;
 }
  #############################################################################
 ### Setters ###################################################################
  #############################################################################
+sub setBias {
+	# Grab the instance and bias
+	my($oSelf, $iBias)           = @_;
+	# Store the bias in the system
+	$oSelf->{"oBias"}{"iValue"}  = $iBias;
+	$oSelf->{"oBias"}{"iWeight"} = $oSelf->getWeight();
+	# Return instance
+	return $oSelf;
+}
 sub setThreshold {
 	# Grab the instance and threshold
 	my($oSelf, $iThreshold) = @_;

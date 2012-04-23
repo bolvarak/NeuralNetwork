@@ -40,29 +40,37 @@ while ($sData =~ m/\<td\s*?class=\"([a-zA-Z0-9]+)\"\>&nbsp;\<\/td\>/g) {
 
 	}
 }
-# Set the network instance
-NeuralNetwork::getInstance()                              # Grab the instance
-	->clearStorage()                                      # Clear the DB (optional)
-	->setThreshold(int(rand(99999999999)))                # Set the threshold
-	->addLayer(3, scalar(@aInputValues), \@aInputValues); # Add a layer 
-# Grab the activation object
-my($oActivation) = NeuralNetwork::getInstance()->getActivation();
-# Print the neuron map
-NeuralNetwork::getInstance()->dumpNetwork();
 # Generate and display the neuron output
 print "\n";
-print "-------------------------------------\n";
-print "--- The Activation Results Is -------\n";
-print "-------------------------------------\n";
-print $oActivation->{"bActive"};
-print "\n\n";
-print "-------------------------------------\n";
-print "--- The Total Outcome Was -----------\n";
-print "-------------------------------------\n";
-print $oActivation->{"iOutput"};
-print "\n\n";
-print "-------------------------------------\n";
-print "--- The Sigmoid Is ------------------\n";
-print "-------------------------------------\n";
-print $oActivation->{"iSigmoid"};
-print "\n\n";
+print "--------------------------------------------------------------------------------\n";
+print "--- The Outcome Was ------------------------------------------------------------\n";
+print "--------------------------------------------------------------------------------\n";
+print "--- Successful Bias -- ", &networkTrainer(-1.00)->{"iSuccessBias"}, " --------------------------------------------------------\n";
+print "--------------------------------------------------------------------------------\n";
+print "--------------------------------------------------------------------------------\n";
+print "\n";
+# Define the trainer
+sub networkTrainer {
+	# Grab the set values and weights
+	glob @aInputValues;
+	glob @aInputWeights;
+	# Grab the new bias
+	my($iBias) = shift;
+	# Instantiate the neural network
+	my($oNetwork) = new NeuralNetwork();
+	# Set the bias
+	$oNetwork->setBias(-1.00);
+	# Add the layer
+	$oNetwork->addLayer(1, scalar(@aInputValues), \@aInputValues);
+	# Grab the activation objects
+	my(@aActivations) = $oNetwork->getActivation();
+	# Check the activation
+	if (int $aActivations[0]->{"iOutput"} ne 1) {
+		# Return this function
+		return &networkTrainer($iBias += 0.01);
+	}
+	# Return success
+	return {
+		"iSuccessBias" => $iBias
+	};
+}
