@@ -56,7 +56,7 @@ sub addInput {
 	# Grab the value
 	my($iValue)  = shift;
 	# Generate the weight
-	my($iWeight) = $oSelf->getWeight();
+	my($iWeight) = shift;
 	# Append the input
 	$oSelf->{"oLayers"}{$iLayer}{$iNeuron}{$oSelf->storeInput($iNeuron, $iLayer, $iValue, $iWeight)} = {
 		iInput  => $iValue, 
@@ -65,47 +65,27 @@ sub addInput {
 	# Return instance
 	return $oSelf;
 }
-sub addInputs {
-	# Grab the instance
-	my($oSelf)   = shift;
-	# Grab the layer identifier
-	my($iLayer)  = shift;
-	# Grab the neuron identifier
-	my($iNeuron) = shift;
-	# Grab the number of inputs
-	my($iInputs) = shift;
-	# Loop to the inputs
-	for (my $iInput = 0; $iInput < $iInputs; $iInput ++) {
-		# Append the input to the inputs
-		push(@{$oSelf->{"oLayers"}{$iLayer}{$iNeuron}}, {
-			iInput  => $iInput,
-			iWeight => $oSelf->getWeight()
-		});
-	}
-	# Return instance
-	return $oSelf; 
-}
 sub addLayer {
-	# Grab the instance, number of neurons number of inputs and input values
-	my($oSelf, $iNeurons, $iInputs, $aInputValues) = @_;
+	# Grab the instance, number of neurons number of inputs, input values and input weights
+	my($oSelf, $iNeurons, $iInputs, $aInputValues, $aInputWeights) = @_;
 	# Generate the layer id
-	my($iLayer)                                    = $oSelf->storeLayer($iNeurons);
+	my($iLayer)                                                    = $oSelf->storeLayer($iNeurons);
 	# Add the layer
-	$oSelf->{"oLayers"}{$iLayer}                    = {};
+	$oSelf->{"oLayers"}{$iLayer}                                   = {};
 	# Check for neuron count
 	if ($iNeurons) {
 		# Go ahead and add the neurons
 		for (my $iNeuron = 0; $iNeuron < $iNeurons; $iNeuron ++) {
 			# Add the neuron
-			$oSelf->addNeuron($iLayer, $iInputs, $aInputValues);
+			$oSelf->addNeuron($iLayer, $iInputs, $aInputValues, $aInputWeights);
 		}
 	}
 	# Return instance
 	return $oSelf;
 }
 sub addNeuron {
-	# Grab the instance, layer identifier, number of inputs and input values
-	my($oSelf, $iLayer, $iInputs, $aInputValues)                         = @_;
+	# Grab the instance, layer identifier, number of inputs, input values and input weights
+	my($oSelf, $iLayer, $iInputs, $aInputValues, $aInputWeights)         = @_;
 	# Generate a neuron id
 	my($iNeuron)                                                         = $oSelf->storeNeuron($iLayer, $iInputs);
 	# Add the neuron
@@ -113,7 +93,7 @@ sub addNeuron {
 	# Loop through the inputs and set the values
 	for (my $iInput = 1; $iInput < $iInputs; $iInput ++) {
 		# Add the input
-		$oSelf->addInput($iLayer, $iNeuron, @{$aInputValues}[$iInput]);
+		$oSelf->addInput($iLayer, $iNeuron, @{$aInputValues}[$iInput], $oSelf->getWeight());
 	}
 	# Return instance
 	return $oSelf;
@@ -340,11 +320,6 @@ sub getWeight {
 	my($oSelf)    = shift;
 	# Generate the random number
 	my($iWeight)  = rand(1.0);
-	# Now generate a random boolean
-	if (int(rand(2))) {
-		# Make the weight negative
-		$iWeight *= -1;
-	}
 	# Return a random weight
 	return $iWeight;
 }
