@@ -7,8 +7,6 @@ use strict;
 use DBI;
 # Use our debugger
 use Data::Dumper;
-# Use Perl's trigonometry packages
-use Math::Trig;
 # Our instance placeholder
 my($oInstance);
  #############################################################################
@@ -190,6 +188,10 @@ sub dumpNetwork {
 sub storeActivation {
 	# Grab the instance and activation object
 	my($oSelf, $oActivation) = @_;
+	# Generate the statement
+	my($oStatement)          = $oSelf->{"oDbc"}->prepare("INSERT INTO Output (iNeuronId, iLayerId, iOutput, bActive, iSigmoid, sCreated) VALUES (?, ?, ?, ?, ?, datetime());");
+	# Execute the statement
+	$oStatement->execute($oActivation->{"iNeuronId"}, $oActivation->{"iLayerId"}, $oActivation->{"iOutput"}, $oActivation->{"bActive"}, $oActivation->{"iSigmoid"});
 	# Return the activation id
 	return $oSelf->{"oDbc"}->last_insert_id("", "", "Output", "");
 }
@@ -295,13 +297,23 @@ sub getActivation {
 					# Multiply to get the output
 					$iActivation += (int $oInput->{"iWeight"} * $oInput->{"iInput"});
 				}
+				# Generate the sigmoid
+				my($iSigmoid)  = $oSelf->getSigmoid($iActivation);
+				# Generate the output id
+				my($iOutputId) = $oSelf->storeActivation({
+					"bActive"   => (($iActivation ge $oSelf->{"iThreshold"}) ? 1 : 0),
+					"iLayerId"  => $iLayerId,
+					"iNeuronId" => $iNeuronId,
+					"iOutput"   => $iActivation,
+					"iSigmoid"  => $iSigmoid
+				});
 				# push the activation to the array
 				push(@aActivations, {
 					"bActive"   => (($iActivation ge $oSelf->{"iThreshold"}) ? 1 : 0), 
 					"iLayerId"  => $iLayerId, 
 					"iNeuronId" => $iNeuronId,
 					"iOutput"   => $iActivation, 
-					"iSigmoid"  => $oSelf->getSigmoid($iActivation)
+					"iSigmoid"  => $iSigmoid
 				});
 			}
 		}
@@ -312,8 +324,10 @@ sub getActivation {
 sub getSigmoid {
 	# Grab the instance and activation
 	my($oSelf, $iActivation) = @_;
+	# Setup e
+	my($iE)                  = 2.7183;
 	# Return the output
-	return tanh($iActivation);
+	return ((($iE ** $iActivation) - ($iE ** (-1 * $iActivation))) / (($iE ** $iActivation) + ($iE ** (-1 * $iActivation))));
 }
 sub getThreshold {
 	# Grab the instance

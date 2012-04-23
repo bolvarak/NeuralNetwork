@@ -20,7 +20,6 @@ print "-------------------------------------\n";
 print "--- The Activation Results Is -------\n";
 print "-------------------------------------\n";
 print $oActivation->{"bActive"};
-print " or ", (($oActivation->{"bActive"} eq 1) ? "True" : "False");
 print "\n\n";
 print "-------------------------------------\n";
 print "--- The Total Outcome Was -----------\n";
