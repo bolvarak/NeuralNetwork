@@ -3,17 +3,13 @@
 use strict;
 # Use our neural network
 use NeuralNetwork;
+# Set the input values
+my(@aInputValues) = (1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 0, 0);
 # Set the network instance
 NeuralNetwork::getInstance()               # Grab the instance
+	->clearStorage()                       # Clear the DB (optional)
 	->setThreshold(int(rand(99999999999))) # Set the threshold
-	->addLayer(1);                         # Add a layer 
-# Let's generate some neurons and inputs
-for my $iNeuron (1 .. 3) {
-	# Add the neuron
-	NeuralNetwork::getInstance()      # Instantiate the network
-		->addNeuron(1, $iNeuron)      # Add a neuron to the layer
-		->addInputs(1, $iNeuron, 64); # Give the neuron some inputs
-}
+	->addLayer(3, 64, \@aInputValues);     # Add a layer 
 # Grab the activation object
 my($oActivation) = NeuralNetwork::getInstance()->getActivation();
 # Print the neuron map

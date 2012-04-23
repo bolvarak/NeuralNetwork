@@ -3,6 +3,10 @@
 package NeuralNetwork;
 # Use strict syntax
 use strict;
+# Use our database connectors
+use DBI;
+# Use our debugger
+use Data::Dumper;
 # Use Perl's trigonometry packages
 use Math::Trig;
 # Our instance placeholder
@@ -29,6 +33,9 @@ sub new {
 	# Setup the instance
 	my($oSelf)  = {
 		iBias      => -1.0, 
+		oDbc       => DBI->connect("dbi:SQLite:dbname=Db/NeuralNetwork.db", "", "", {
+			RaiseError => 1
+		}),
 		oLayers    => {},
 		iThreshold => 0
 	};
@@ -50,11 +57,13 @@ sub addInput {
 	my($iNeuron) = shift;
 	# Grab the value
 	my($iValue)  = shift;
+	# Generate the weight
+	my($iWeight) = $oSelf->getWeight();
 	# Append the input
-	push(@{$oSelf->{"oLayers"}{$iLayer}{$iNeuron}}, {
-		iInput  => (($iValue) ? $iValue : (scalar(@{$oSelf->{"oLayers"}{$iLayer}{$iNeuron}}))), 
-		iWeight => $oSelf->getWeight()
-	});
+	$oSelf->{"oLayers"}{$iLayer}{$iNeuron}{$oSelf->storeInput($iNeuron, $iLayer, $iValue, $iWeight)} = {
+		iInput  => $iValue, 
+		iWeight => $iWeight
+	};
 	# Return instance
 	return $oSelf;
 }
@@ -79,26 +88,54 @@ sub addInputs {
 	return $oSelf; 
 }
 sub addLayer {
-	# Grab the instance, layer identifier and number of neurons
-	my($oSelf, $iLayer, $iNeurons) = @_;
+	# Grab the instance, number of neurons number of inputs and input values
+	my($oSelf, $iNeurons, $iInputs, $aInputValues) = @_;
+	# Generate the layer id
+	my($iLayer)                                    = $oSelf->storeLayer($iNeurons);
 	# Add the layer
-	$oSelf->{"oLayers"}{$iLayer}   = {};
+	$oSelf->{"oLayers"}{$iLayer}                    = {};
 	# Check for neuron count
 	if ($iNeurons) {
 		# Go ahead and add the neurons
 		for (my $iNeuron = 0; $iNeuron < $iNeurons; $iNeuron ++) {
 			# Add the neuron
-			$oSelf->addNeuron($iLayer, $iNeuron);
+			$oSelf->addNeuron($iLayer, $iInputs, $aInputValues);
 		}
 	}
 	# Return instance
 	return $oSelf;
 }
 sub addNeuron {
-	# Grab the instance, layer identifier and neuron identifier
-	my($oSelf, $iLayer, $iNeuron) = @_;
+	# Grab the instance, layer identifier, number of inputs and input values
+	my($oSelf, $iLayer, $iInputs, $aInputValues)                         = @_;
+	# Generate a neuron id
+	my($iNeuron)                                                         = $oSelf->storeNeuron($iLayer, $iInputs);
 	# Add the neuron
-	$oSelf->{"oLayers"}{$iLayer}{$iNeuron} = [];
+	$oSelf->{"oLayers"}{$iLayer}{$iNeuron}                               = {};
+	# Loop through the inputs and set the values
+	for (my $iInput = 1; $iInput < $iInputs; $iInput ++) {
+		# Add the input
+		$oSelf->addInput($iLayer, $iNeuron, @{$aInputValues}[$iInput]);
+	}
+	# Return instance
+	return $oSelf;
+}
+sub clearStorage {
+	# Grab the instance
+	my($oSelf) = shift;
+	# Generate layer delete statement
+	my($oLayerStatement)  = $oSelf->{"oDbc"}->prepare("DELETE FROM Layers;");
+	# Generate neuron delete statement
+	my($oNeuronStatement) = $oSelf->{"oDbc"}->prepare("DELETE FROM Neurons;");
+	# Generate input delete statement
+	my($oInputStatement)  = $oSelf->{"oDbc"}->prepare("DELETE FROM Inputs;");
+	# Generate output delete statement
+	my($oOutputStatement) = $oSelf->{"oDbc"}->prepare("DELETE FROM Output;");
+	# Execute the statements
+	$oLayerStatement->execute();
+	$oNeuronStatement->execute();
+	$oInputStatement->execute();
+	$oOutputStatement->execute();
 	# Return instance
 	return $oSelf;
 }
@@ -112,15 +149,17 @@ sub dumpNetwork {
 		# Print the layer id
 		print($iLayer, " => ", "\n");
 		# Loop through the neurons
-		while (my($iNeuron, @aInputs) = each(%{$oSelf->{"oLayers"}{$iLayer}})) {
+		while (my($iNeuron, $oInput) = each(%{$oSelf->{"oLayers"}{$iLayer}})) {
 			# Print the neuron id
 			print("\t", $iNeuron, " => ", "\n");
 			# Loop through the inputs
-			for my $oInput (@{$oSelf->{"oLayers"}{$iLayer}{$iNeuron}}) {
-				# Print the input
-				print("\t\t", "iInput => ", $oInput->{"iInput"}, "\n");
-				# Print the weight
-				print("\t\t", "iWeight => ", $oInput->{"iWeight"}, "\n\n");
+			while (my($sKey, $oData) = each(%{$oInput})) {
+				# Print the input value
+				print("\t\t", "iInput => ", $oData->{"iInput"}, "\n");
+				# Print the input weight
+				print("\t\t", "iWeight => ", $oData->{"iWeight"}, "\n");
+				# Print another newline
+				print("\n");
 			}
 		}
 	}
@@ -148,6 +187,42 @@ sub dumpNetwork {
 	# Return
 	return undef;
 }
+sub storeActivation {
+	# Grab the instance and activation object
+	my($oSelf, $oActivation) = @_;
+	# Return the activation id
+	return $oSelf->{"oDbc"}->last_insert_id("", "", "Output", "");
+}
+sub storeInput {
+	# Grab the instance, neuron ID, layer ID, value and weight
+	my($oSelf, $iNeuronId, $iLayerId, $iValue, $iWeight) = @_;
+	# Generate the statement
+	my($oStatement)                                      = $oSelf->{"oDbc"}->prepare("INSERT INTO Inputs (iNeuronId, iLayerId, iValue, iWeight, sCreated) VALUES (?, ?, ?, ?, datetime())");
+	# Execute the statement
+	$oStatement->execute($iNeuronId, $iLayerId, $iValue, $iWeight);
+	# Return the input id
+	return $oSelf->{"oDbc"}->last_insert_id("", "", "Inputs", "");
+}
+sub storeLayer {
+	# Grab the instance and neuron count
+	my($oSelf, $iNeurons) = @_;
+	# Generate the statement
+	my($oStatement)       = $oSelf->{"oDbc"}->prepare("INSERT INTO Layers (iNeurons, sCreated) VALUES (?, datetime())");
+	# Execute the statement
+	$oStatement->execute($iNeurons);
+	# Return the layer id
+	return $oSelf->{"oDbc"}->last_insert_id("", "", "Layers", "");
+}
+sub storeNeuron {
+	# Grab the instance, layer ID and input count
+	my($oSelf, $iLayerId, $iInputs) = @_;
+	# Generate the statement
+	my($oStatement)                 = $oSelf->{"oDbc"}->prepare("INSERT INTO Neurons (iLayerId, iInputs, sCreated) VALUES (?, ?, datetime())");
+	# Execute the statement
+	$oStatement->execute($iLayerId, $iInputs);
+	# Return the neuron id
+	return $oSelf->{"oDbc"}->last_insert_id("", "", "Neurons", "");
+}
  #############################################################################
 ### Getters ###################################################################
  #############################################################################
@@ -167,7 +242,7 @@ sub getActivation {
 		# Check for the layer and neuron
 		if ($oSelf->{"oLayers"}{$iLayer} and $oSelf->{"oLayers"}{$iLayer}{$iNeuron}) {
 			# Loop through the inputs
-			for my $oInput (@{$oSelf->{"oLayers"}{$iLayer}{$iNeuron}}) {
+			while (my($sKey, $oInput) = each(%{$oSelf->{"oLayers"}{$iLayer}{$iNeuron}})) {
 				# Multiply to get the output
 				$iActivation += (int $oInput->{"iWeight"} * int $oInput->{"iInput"});
 			}
@@ -191,7 +266,7 @@ sub getActivation {
 				# Reset the activation
 				$iActivation = 0;
 				# Loop through the inputs
-				for my $oInput (@{$oSelf->{"oLayers"}{$iLayer}{$iNeuronId}}) {
+				while (my($sKey, $oInput) = each(%{$oSelf->{"oLayers"}{$iLayer}{$iNeuronId}})) {
 					# Multiply to get the output
 					$iActivation += (int $oInput->{"iWeight"} * $oInput->{"iInput"});
 				}
@@ -216,7 +291,7 @@ sub getActivation {
 				# Reset the activation
 				$iActivation = 0;
 				# Loop through the inputs
-				for my $oInput (@{$oSelf->{"oLayers"}{$iLayerId}{$iNeuronId}}) {
+				while (my($sKey, $oInput) = each(%{$oSelf->{"oLayers"}{$iLayerId}{$iNeuronId}})) {
 					# Multiply to get the output
 					$iActivation += (int $oInput->{"iWeight"} * $oInput->{"iInput"});
 				}
